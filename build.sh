@@ -1,7 +1,7 @@
 #!/bin/bash
 
 APP_NAME=mvn-snapshot-cleaner
-APP_VERSION=1.0
+APP_VERSION=1.1
 DIST_DIR=dist
 BUILD_TIME=$(date "+%F %T %Z")
 

@@ -14,7 +14,7 @@ import (
 
 var (
 	appVersion = "dev"
-	buildTime  = ""
+	buildTime  = "unknow"
 )
 
 type metadataObj struct {
@@ -49,16 +49,21 @@ func handleTargetDirs(repoPath string) error {
 		repoPath = path.Join(u.HomeDir, repoPath[1:])
 	}
 	count := 0
-	err := handleDir(repoPath, &count)
+	totalSize := int64(0)
+	err := handleDir(repoPath, &count, &totalSize)
 	if err != nil {
 		return err
 	}
-	fmt.Println("==============================================")
-	fmt.Printf("Total %d entries cleaned\n", count)
+	if count == 0 {
+		fmt.Println("Nothing to clean")
+	} else {
+		fmt.Println("==============================================")
+		fmt.Printf("Total %d entries cleaned, %s recycled :)\n", count, byteSize(totalSize).String())
+	}
 	return nil
 }
 
-func handleDir(pDir string, count *int) error {
+func handleDir(pDir string, count *int, totalSize *int64) error {
 	files, err := ioutil.ReadDir(pDir)
 	if err != nil {
 		return err
@@ -67,7 +72,7 @@ func handleDir(pDir string, count *int) error {
 	filenames := make([]string, 0)
 	for _, f := range files {
 		if f.IsDir() {
-			handleDir(path.Join(pDir, f.Name()), count)
+			handleDir(path.Join(pDir, f.Name()), count, totalSize)
 		} else {
 			if strings.HasPrefix(f.Name(), "maven-metadata") && strings.HasSuffix(f.Name(), ".xml") {
 				metadataFile = f.Name()
@@ -96,7 +101,11 @@ func handleDir(pDir string, count *int) error {
 					historyCount++
 				}
 				filePath := path.Join(pDir, ff)
-				err := os.Remove(filePath)
+				fstat, err := os.Stat(filePath)
+				if err == nil {
+					*totalSize += fstat.Size()
+				}
+				err = os.Remove(filePath)
 				if err != nil {
 					fmt.Println("Could not remove file:", filePath)
 				}
@@ -145,4 +154,29 @@ func readMetadataFile(filePath string) (metadataObj, error) {
 		}
 	}
 	return mo, nil
+}
+
+type byteSize float64
+
+const (
+	_           = iota
+	kb byteSize = 1 << (10 * iota)
+	mb
+	gb
+	tb
+)
+
+func (b byteSize) String() string {
+	switch {
+	case b >= tb:
+		return fmt.Sprintf("%.2fTB", b/tb)
+	case b >= gb:
+		return fmt.Sprintf("%.2fGB", b/gb)
+	case b >= mb:
+		return fmt.Sprintf("%.2fMB", b/mb)
+	case b >= kb:
+		return fmt.Sprintf("%.2fKB", b/kb)
+
+	}
+	return fmt.Sprintf("%.2fB", b)
 }
